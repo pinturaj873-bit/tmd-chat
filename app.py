@@ -1,4 +1,6 @@
-import os, sqlite3, secrets, time, mimetypes, uuid\nfrom io import BytesIO\nimport qrcode
+import os, sqlite3, secrets, time, mimetypes, uuid
+from io import BytesIO
+import qrcode
 from functools import wraps
 from urllib.parse import urljoin
 from flask import Flask, request, session, redirect, url_for, render_template, jsonify, send_from_directory, send_file

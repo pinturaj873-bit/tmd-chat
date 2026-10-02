@@ -52,7 +52,10 @@ def ensure_default_membership(con,user_id):
         con.execute("INSERT OR IGNORE INTO chat_members(chat_id,user_id,joined_at) VALUES(?,?,?)",(row["id"],user_id,now))
 
 def current_user(con):
-    return con.execute("SELECT * FROM users WHERE id=?",(session["user_id"],)).fetchone()
+    uid = session.get("user_id")
+    if not uid:
+        return None
+    return con.execute("SELECT * FROM users WHERE id=?",(uid,)).fetchone()
 
 @app.route("/")
 def index(): return redirect(url_for("home") if "user_id" in session else url_for("login"))
@@ -102,7 +105,13 @@ def logout():
 @app.route("/home")
 @login_required
 def home():
-    con=db(); user=current_user(con); ensure_default_membership(con,user["id"])
+    con=db()
+    user=current_user(con)
+    if user is None:
+        con.close()
+        session.clear()
+        return redirect(url_for("login"))
+    ensure_default_membership(con,user["id"])
     chats=con.execute("""SELECT c.*,COALESCE((SELECT body FROM messages m WHERE m.chat_id=c.id ORDER BY m.id DESC LIMIT 1),'No messages yet') last_message,(SELECT COUNT(*) FROM chat_members cm WHERE cm.chat_id=c.id) member_count,(SELECT COUNT(*) FROM messages m WHERE m.chat_id=c.id) message_count FROM chats c JOIN chat_members me ON me.chat_id=c.id AND me.user_id=? ORDER BY COALESCE((SELECT MAX(m2.id) FROM messages m2 WHERE m2.chat_id=c.id),0) DESC,c.id DESC""",(user["id"],)).fetchall()
     users=con.execute("SELECT id,name,phone,org_name,org_type FROM users WHERE id<>? ORDER BY name",(user["id"],)).fetchall()
     unread=con.execute("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0",(user["id"],)).fetchone()[0]
@@ -111,7 +120,10 @@ def home():
 @app.route("/chat/<int:chat_id>")
 @login_required
 def chat(chat_id):
-    con=db(); user=current_user(con); chat=con.execute("SELECT * FROM chats WHERE id=?",(chat_id,)).fetchone()
+    con=db(); user=current_user(con)
+    if user is None:
+        con.close(); session.clear(); return redirect(url_for("login"))
+    chat=con.execute("SELECT * FROM chats WHERE id=?",(chat_id,)).fetchone()
     member=con.execute("SELECT 1 FROM chat_members WHERE chat_id=? AND user_id=?",(chat_id,user["id"])).fetchone()
     if not chat or not member: con.close(); return redirect(url_for("home"))
     msgs=con.execute("SELECT messages.*,users.name FROM messages JOIN users ON users.id=messages.user_id WHERE chat_id=? ORDER BY messages.id",(chat_id,)).fetchall()
@@ -215,7 +227,10 @@ def notifications_read():
 @app.get("/link")
 @login_required
 def link_page():
-    con=db(); user=current_user(con); token=secrets.token_urlsafe(32)
+    con=db(); user=current_user(con)
+    if user is None:
+        con.close(); session.clear(); return redirect(url_for("login"))
+    token=secrets.token_urlsafe(32)
     con.execute("INSERT INTO linked_devices(user_id,token,device_name,confirmed,created_at,last_seen) VALUES(?,?,?,?,?,?)",(user["id"],token,"Computer",0,int(time.time()),int(time.time()))); con.commit(); con.close()
     link_url=urljoin(request.host_url,url_for("link_confirm",token=token))
     return render_template("qr.html",user=user,link_url=link_url,token=token)

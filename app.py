@@ -1,4 +1,4 @@
-import os, sqlite3, secrets, time, mimetypes, uuid
+import os, sqlite3, secrets, time, mimetypes, uuid\nfrom io import BytesIO\nimport qrcode
 from functools import wraps
 from urllib.parse import urljoin
 from flask import Flask, request, session, redirect, url_for, render_template, jsonify, send_from_directory
@@ -193,10 +193,10 @@ def upload():
     if len(raw)>20*1024*1024: return jsonify(error="File must be 20 MB or smaller"),400
     mime=f.mimetype or mimetypes.guess_type(f.filename)[0] or "application/octet-stream"
     allowed={"application/pdf","text/plain","application/zip","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-    if mime not in allowed and not mime.startswith("image/") and not mime.startswith("audio/"): return jsonify(error="This file type is not supported"),400
+    if mime not in allowed and not mime.startswith("image/") and not mime.startswith("audio/") and not mime.startswith("video/"): return jsonify(error="This file type is not supported"),400
     ext=os.path.splitext(f.filename)[1].lower()[:12]; stored=f"{uuid.uuid4().hex}{ext}"
     with open(os.path.join(UPLOAD_DIR,stored),"wb") as out: out.write(raw)
-    kind="image" if mime.startswith("image/") else "voice" if mime.startswith("audio/") else "document"
+    kind="image" if mime.startswith("image/") else "voice" if mime.startswith("audio/") else "video" if mime.startswith("video/") else "document"
     return jsonify(ok=True,file_name=os.path.basename(f.filename),file_url=url_for("uploaded_file",name=stored),message_type=kind)
 
 @app.get("/uploads/<path:name>")

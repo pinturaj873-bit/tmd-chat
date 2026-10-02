@@ -33,6 +33,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS chat_members(chat_id INTEGER NOT NULL,user_id INTEGER NOT NULL,joined_at INTEGER NOT NULL,PRIMARY KEY(chat_id,user_id));
     CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY AUTOINCREMENT,chat_id INTEGER NOT NULL,user_id INTEGER NOT NULL,body TEXT NOT NULL DEFAULT '',message_type TEXT NOT NULL DEFAULT 'text',file_name TEXT DEFAULT '',file_url TEXT DEFAULT '',created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS notifications(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,title TEXT NOT NULL,body TEXT NOT NULL,is_read INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS contacts(user_id INTEGER NOT NULL,contact_user_id INTEGER NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(user_id,contact_user_id));
     CREATE TABLE IF NOT EXISTS linked_devices(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,token TEXT UNIQUE NOT NULL,device_name TEXT DEFAULT 'Computer',confirmed INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,last_seen INTEGER NOT NULL);
     """)
     cols = {r["name"] for r in con.execute("PRAGMA table_info(linked_devices)").fetchall()}
@@ -267,8 +268,9 @@ def home():
     ensure_default_membership(con,user["id"])
     chats=con.execute("""SELECT c.*,COALESCE((SELECT body FROM messages m WHERE m.chat_id=c.id ORDER BY m.id DESC LIMIT 1),'No messages yet') last_message,(SELECT COUNT(*) FROM chat_members cm WHERE cm.chat_id=c.id) member_count,(SELECT COUNT(*) FROM messages m WHERE m.chat_id=c.id) message_count FROM chats c JOIN chat_members me ON me.chat_id=c.id AND me.user_id=? ORDER BY COALESCE((SELECT MAX(m2.id) FROM messages m2 WHERE m2.chat_id=c.id),0) DESC,c.id DESC""",(user["id"],)).fetchall()
     users=con.execute("SELECT id,name,phone,org_name,org_type FROM users WHERE id<>? ORDER BY name",(user["id"],)).fetchall()
+    contacts=con.execute("SELECT u.id,u.name,u.phone,u.org_name,u.org_type FROM contacts c JOIN users u ON u.id=c.contact_user_id WHERE c.user_id=? ORDER BY u.name",(user["id"],)).fetchall()
     unread=con.execute("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0",(user["id"],)).fetchone()[0]
-    con.commit(); con.close(); return render_template("home.html",user=user,chats=chats,users=users,unread=unread)
+    con.commit(); con.close(); return render_template("home.html",user=user,chats=chats,users=users,contacts=contacts,unread=unread)
 
 @app.route("/chat/<int:chat_id>")
 @login_required
@@ -282,6 +284,35 @@ def chat(chat_id):
     msgs=con.execute("SELECT messages.*,users.name FROM messages JOIN users ON users.id=messages.user_id WHERE chat_id=? ORDER BY messages.id",(chat_id,)).fetchall()
     members=con.execute("SELECT users.id,users.name,users.phone,users.org_name FROM chat_members JOIN users ON users.id=chat_members.user_id WHERE chat_members.chat_id=? ORDER BY users.name",(chat_id,)).fetchall()
     con.close(); return render_template("chat.html",user=user,chat=chat,messages=msgs,members=members)
+
+@app.post("/api/contacts")
+@login_required
+def add_contact():
+    data=request.get_json() or {}
+    phone=normalize_phone(data.get("phone",""))
+    if not phone.isdigit() or len(phone)<10 or len(phone)>15:
+        return jsonify(error="Please enter a valid mobile number."),400
+    con=db()
+    other=con.execute("SELECT id,name,phone,org_name,org_type FROM users WHERE phone=?",(phone,)).fetchone()
+    if not other:
+        con.close()
+        return jsonify(error="No TMD Chat user found with this mobile number. They must sign up first."),404
+    if other["id"]==session["user_id"]:
+        con.close()
+        return jsonify(error="You cannot add your own number."),400
+    con.execute("INSERT OR IGNORE INTO contacts(user_id,contact_user_id,created_at) VALUES(?,?,?)",(session["user_id"],other["id"],int(time.time())))
+    con.commit()
+    contact=dict(other)
+    con.close()
+    return jsonify(ok=True,contact=contact)
+
+@app.get("/api/contacts")
+@login_required
+def contacts_api():
+    con=db()
+    rows=con.execute("SELECT u.id,u.name,u.phone,u.org_name,u.org_type FROM contacts c JOIN users u ON u.id=c.contact_user_id WHERE c.user_id=? ORDER BY u.name",(session["user_id"],)).fetchall()
+    con.close()
+    return jsonify([dict(r) for r in rows])
 
 @app.post("/api/direct-chat")
 @login_required

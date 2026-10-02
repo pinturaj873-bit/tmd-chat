@@ -78,3 +78,87 @@
 .reference-dashboard .ref-brand small {
   font-weight: 400 !important;
 }
+
+/* Dashboard palette: grey + sky blue + silver */
+.reference-dashboard{
+  background:
+    radial-gradient(circle at 5% 0,#dce8ef 0,transparent 24%),
+    radial-gradient(circle at 96% 8%,#d8eef7 0,transparent 22%),
+    linear-gradient(135deg,#f4f7f9,#eaf3f7 55%,#f8fafb) !important;
+}
+.reference-dashboard .ref-features>div{
+  background:linear-gradient(180deg,#edf3f6,#f9fbfc) !important;
+  border-color:#d5e0e6 !important;
+}
+.reference-dashboard .ref-features span{
+  background:linear-gradient(145deg,#8ccfe9,#6e9fb7) !important;
+  box-shadow:0 7px 14px rgba(76,130,153,.20) !important;
+}
+.reference-dashboard .ref-main{
+  border-color:#d4e0e6 !important;
+}
+.reference-dashboard .ref-nav{
+  background:linear-gradient(180deg,#ffffff,#f2f6f8) !important;
+  border-color:#d6e1e7 !important;
+}
+.reference-dashboard .ref-nav>a.active{
+  background:linear-gradient(100deg,#6eaec7,#8fcde0) !important;
+  color:#fff !important;
+  box-shadow:0 8px 18px rgba(80,130,150,.20) !important;
+}
+.reference-dashboard .ref-nav-user{
+  background:#edf4f7 !important;
+}
+.reference-dashboard .ref-chat-list{
+  border-color:#d6e1e7 !important;
+}
+.reference-dashboard .ref-search{
+  border-color:#d5e1e7 !important;
+  background:#fafcfd !important;
+}
+.reference-dashboard .ref-tabs button.active{
+  color:#5c9db8 !important;
+  border-bottom-color:#78b9d0 !important;
+}
+.reference-dashboard .ref-chat-item:hover{
+  background:#f0f5f7 !important;
+}
+.reference-dashboard .ref-avatar{
+  background:linear-gradient(145deg,#8bcce4,#7398ab) !important;
+}
+.reference-dashboard .ref-avatar.navy{
+  background:linear-gradient(145deg,#70818c,#56646d) !important;
+}
+.reference-dashboard .ref-conversation{
+  background:#fff !important;
+}
+.reference-dashboard .ref-conv-head{
+  border-color:#dce5e9 !important;
+}
+.reference-dashboard .ref-conv-actions button{
+  color:#667983 !important;
+}
+.reference-dashboard .ref-welcome-icon{
+  background:linear-gradient(145deg,#91d2e8,#7298aa) !important;
+  box-shadow:0 10px 25px rgba(82,132,151,.20) !important;
+}
+.reference-dashboard .primary-btn{
+  background:linear-gradient(135deg,#7fc6de,#658fa4) !important;
+  box-shadow:0 8px 18px rgba(78,126,146,.22) !important;
+}
+.reference-dashboard .ref-download{
+  background:linear-gradient(180deg,#6faec7,#7295a5) !important;
+}
+.reference-dashboard .download-card{
+  border-color:rgba(255,255,255,.55) !important;
+  background:rgba(255,255,255,.06) !important;
+}
+.reference-dashboard .ref-add{
+  background:linear-gradient(145deg,#83c9df,#688fa2) !important;
+}
+.reference-dashboard .ref-howto h2{
+  background:linear-gradient(100deg,#7ebfd5,#8298a5) !important;
+}
+.reference-dashboard .ref-howto article b{
+  background:linear-gradient(145deg,#83c9df,#6f96a8) !important;
+}

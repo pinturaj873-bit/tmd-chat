@@ -2,82 +2,68 @@
 {% block title %}TMD Chat{% endblock %}
 {% block body_class %}home-body{% endblock %}
 {% block content %}
-<div class="reference-dashboard" {% if user.background %}style="background-image:linear-gradient(rgba(248,252,255,.88),rgba(237,247,255,.90)),url('{{user.background}}');background-size:cover;background-position:center;background-attachment:fixed"{% endif %}>
-  <header class="ref-header">
-    <a class="ref-brand" href="/home">
-      <img src="/static/icon.svg" alt="TMD Chat">
-      <div><strong><span>TMD</span> Chat</strong><small>CONNECT • COMMUNICATE • GROW</small></div>
-    </a>
-    <div class="ref-features">
-      <div onclick="openContacts()"><span>•••</span><b>One to One<br>Chat</b></div>
-      <div onclick="openModal('newChatModal')"><span>👥</span><b>Group<br>Chat</b></div>
-      <div onclick="showAction('Photo & Video Sharing','Open a chat to share photos and videos.')"><span>▧</span><b>Photo & Video<br>Sharing</b></div>
-      <div onclick="showAction('Document Sharing','Open a chat to share PDF, Word, Excel and other supported documents.')"><span>▤</span><b>Document<br>Sharing</b></div>
-      <div onclick="showAction('Voice Message','Open a chat to record and send a voice message.')"><span>♟</span><b>Voice<br>Message</b></div>
-      <div onclick="showAction('Voice & Video Calls','Calling will be available from an active chat.')"><span>☎</span><b>Voice & Video<br>Calls</b></div>
-      <div onclick="openModal('newChatModal')"><span>👥</span><b>Company / Shop<br>Team Chat</b></div>
-      <div onclick="showAction('Secure & Private','Your TMD Chat account is protected by mobile OTP login and session authentication.')"><span>✓</span><b>Secure<br>& Private</b></div>
-      <div onclick="location.href='/link'"><span>▣</span><b>Works on<br>Mobile & Computer</b></div>
+<div class="tmd-wa-shell" {% if user.background %}style="--user-bg:url('{{user.background}}')"{% endif %}>
+  <aside class="tmd-rail">
+    <div class="tmd-rail-logo"><img src="/static/icon.svg" alt="TMD Chat"></div>
+    <nav>
+      <a class="active" href="/home" title="Chats"><span>▣</span><b>Chats</b>{% if unread %}<em>{{unread}}</em>{% endif %}</a>
+      <a href="#" onclick="openStatus();return false;" title="Status"><span>◉</span><b>Status</b></a>
+      <a href="#" onclick="openModal('newChatModal');return false;" title="Groups"><span>♣</span><b>Groups</b></a>
+      <a href="#" onclick="showAction('Calls','Voice and video calling will be available from an active chat.');return false;" title="Calls"><span>☎</span><b>Calls</b></a>
+      <a href="#" onclick="showAction('Files','Open a chat to send and receive documents, photos, videos and voice messages.');return false;" title="Files"><span>▤</span><b>Files</b></a>
+      <a href="#" onclick="showAction('Announcements','Company Announcements is available in your chat list.');return false;" title="Announcements"><span>⚑</span><b>News</b></a>
+    </nav>
+    <div class="tmd-rail-bottom">
+      <a href="#" onclick="openSettings();return false;" title="Settings"><span>⚙</span><b>Settings</b></a>
+      <button onclick="openContacts()" title="Contacts"><div class="avatar {% if user.avatar %}photo-avatar{% endif %}" {% if user.avatar %}style="background-image:url('{{user.avatar}}')"{% endif %}>{{'' if user.avatar else user.name[:1]|upper}}</div><b>{{user.name}}</b></button>
     </div>
-    <div class="ref-user"><div class="avatar mini {% if user.avatar %}photo-avatar{% endif %}" {% if user.avatar %}style="background-image:url('{{user.avatar}}')"{% endif %}>{{'' if user.avatar else user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small><i></i> Online</small></div><span>⌄</span></div>
-  </header>
+  </aside>
 
-  <main class="ref-main">
-    <aside class="ref-nav">
-      <a class="active" href="/home"><span>▣</span>Chats{% if unread %}<em>{{unread}}</em>{% endif %}</a>
-      <a href="#" onclick="openModal('newChatModal');return false;"><span>♣</span>Groups</a>
-      <a href="#" onclick="openContacts();return false;"><span>♙</span>Contacts</a>
-      <a href="#" onclick="showAction('Calls','Voice and video calling will be available from an active chat.');return false;"><span>☎</span>Calls</a>
-      <a href="#" onclick="showAction('Files','Open a chat to send and receive documents, photos, videos and voice messages.');return false;"><span>▤</span>Files</a>
-      <a href="#" onclick="showAction('Announcements','Company Announcements is available in your chat list.');return false;"><span>⚑</span>Announcements</a>
-      <a href="#" onclick="openStatus();return false;"><span>◉</span>Status</a>
-      <a href="#" onclick="openSettings();return false;"><span>⚙</span>Settings</a>
-      <div class="ref-nav-user"><div class="avatar {% if user.avatar %}photo-avatar{% endif %}" {% if user.avatar %}style="background-image:url('{{user.avatar}}')"{% endif %}>{{'' if user.avatar else user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small>{{user.role|title}}</small></div></div>
-    </aside>
-
-    <section class="ref-chat-list">
-      <div class="ref-search"><span>⌕</span><input id="chatSearch" placeholder="Search chats, people, groups..." oninput="filterChats(this.value)"></div>
-      <div class="ref-tabs"><button class="active">All</button><button>Unread{% if unread %}<em>{{unread}}</em>{% endif %}</button><button>Groups</button><button>Teams</button></div>
-      <div id="chatList">
-        {% for c in chats %}
-        <a class="ref-chat-item" href="/chat/{{c.id}}" data-search="{{(c.title ~ ' ' ~ c.last_message)|lower}}">
-          <div class="ref-avatar {% if c.kind=='announcement' %}navy{% endif %}">{{c.title[:1]|upper}}</div>
-          <div><strong>{{c.title}}</strong><p>{{c.last_message[:48]}}</p></div><time>{% if c.message_count %}{{c.message_count}}{% else %}—{% endif %}</time>
-        </a>
-        {% else %}<div class="empty-state">No chats yet.</div>{% endfor %}
+  <section class="tmd-chat-sidebar">
+    <header class="tmd-chat-head">
+      <div>
+        <div class="tmd-brand-line"><img src="/static/icon.svg" alt=""><strong><span>TMD</span> Chat</strong></div>
+        <small>CONNECT • COMMUNICATE • GROW</small>
       </div>
-      <button class="ref-add" onclick="openModal('newChatModal')">＋</button>
-    </section>
+      <div class="tmd-head-actions"><button onclick="openModal('newChatModal')" title="New chat">＋</button><button onclick="showAction('More','Use Settings, Contacts and Status from the left menu.')" title="Menu">⋮</button></div>
+    </header>
+    <div class="tmd-search"><span>⌕</span><input id="chatSearch" placeholder="Search chats, people, groups..." oninput="filterChats(this.value)"></div>
+    <div class="tmd-filters"><button class="active">All</button><button>Unread{% if unread %}<em>{{unread}}</em>{% endif %}</button><button>Groups</button><button>Teams</button></div>
+    <div class="tmd-archive" onclick="showAction('Archived','Archived chats will appear here when you archive a conversation.')"><span>⌄</span> Archived</div>
+    <div id="chatList" class="tmd-chat-list">
+      {% for c in chats %}
+      <a class="tmd-chat-row" href="/chat/{{c.id}}" data-search="{{(c.title ~ ' ' ~ c.last_message)|lower}}">
+        <div class="tmd-chat-avatar {% if c.kind=='announcement' %}announcement{% endif %}">{{c.title[:1]|upper}}</div>
+        <div class="tmd-chat-info"><strong>{{c.title}}</strong><p>{{c.last_message[:55]}}</p></div>
+        <div class="tmd-chat-meta"><time>{% if c.message_count %}{{c.message_count}}{% else %}—{% endif %}</time>{% if c.message_count %}<i>{{c.message_count}}</i>{% endif %}</div>
+      </a>
+      {% else %}
+      <div class="tmd-empty-list"><div>▣</div><h3>No chats yet</h3><p>Start a new chat or add a contact.</p><button class="primary-btn" onclick="openContacts()">＋ Add Contact</button></div>
+      {% endfor %}
+    </div>
+    <button class="tmd-new-chat" onclick="openModal('newChatModal')" title="New chat">＋</button>
+  </section>
 
-    <section class="ref-conversation">
-      <div class="ref-conv-head">
-        <div class="ref-avatar team">👥</div><div><h2>{% if chats %}{{chats[0].title}}{% else %}TMD Chat{% endif %}</h2><p>{% if chats %}Team conversation{% else %}Company • Shop • Team{% endif %} <i></i> Online</p></div>
-        <div class="ref-conv-actions"><button>⌕</button><button>▣</button><button>☎</button><button>⋮</button></div>
+  <main class="tmd-conversation">
+    <header class="tmd-conversation-head">
+      <div class="tmd-conv-person">
+        <div class="tmd-chat-avatar team">T</div>
+        <div><h2>{% if chats %}{{chats[0].title}}{% else %}TMD Chat{% endif %}</h2><p>{% if chats %}Team conversation{% else %}Company • Shop • Team{% endif %} <i></i> Online</p></div>
       </div>
-      <div class="ref-empty-conv">
-        <div class="ref-welcome-icon">TMD</div>
+      <div class="tmd-conv-actions"><button onclick="showAction('Search','Search inside the selected conversation.')" title="Search">⌕</button><button onclick="showAction('Voice Call','Calling will be available from an active chat.')" title="Voice call">☎</button><button onclick="showAction('Video Call','Video calling will be available from an active chat.')" title="Video call">▣</button><button onclick="showAction('Conversation Menu','Open the chat to view its full conversation options.')" title="Menu">⋮</button></div>
+    </header>
+    <div class="tmd-message-area">
+      <div class="tmd-message-watermark">TMD</div>
+      <div class="tmd-welcome">
+        <div class="tmd-welcome-logo">TMD</div>
         <h2>Welcome to TMD Chat</h2>
         <p>Select a chat from the left to start messaging.</p>
         <button class="primary-btn" onclick="openModal('newChatModal')">＋ New Chat</button>
       </div>
-      <div class="ref-composer"><button>☺</button><button>⌕</button><input placeholder="Type a message..." disabled><button>▣</button><button class="mic">♩</button></div>
-    </section>
-
-    <aside class="ref-download">
-      <h2>Download<br><strong>TMD Chat</strong></h2>
-      <p>Scan the QR Code and start<br>chatting with your team now!</p>
-      <div class="download-card"><b>▣ &nbsp; Android App</b><img src="/qr.png?data={{request.url_root}}"></div>
-      <div class="download-card"><b>● &nbsp; iOS App</b><img src="/qr.png?data={{request.url_root}}"></div>
-      <div class="download-card web-card"><b>▣ &nbsp; Web App (Computer)</b><img src="/qr.png?data={{request.url_root}}"><small>⌾ {{request.host}}</small></div>
-    </aside>
+    </div>
+    <div class="tmd-composer"><button title="Emoji">☺</button><button title="Attach" onclick="showAction('Attachments','Open a chat first to send photos, videos, documents and voice messages.')">＋</button><input placeholder="Type a message..." disabled><button class="tmd-mic" title="Voice message">♩</button></div>
   </main>
-
-  <section class="ref-howto">
-    <h2>How to Use TMD Chat</h2>
-    <div><article><b>1</b><strong>▧</strong><h3>Scan the QR Code</h3><p>Scan the QR code from Android, iOS or Web.</p></article><span>›</span><article><b>2</b><strong>⇩</strong><h3>Download & Install</h3><p>Install the TMD Chat application on your device.</p></article><span>›</span><article><b>3</b><strong>♙</strong><h3>Login / Sign Up</h3><p>Login with your mobile number (OTP).</p></article><span>›</span><article><b>4</b><strong>•••</strong><h3>Start Chatting</h3><p>Chat with your team, shops or colleagues.</p></article><span>›</span><article><b>5</b><strong>▣</strong><h3>Use on All Devices</h3><p>Same account on mobile and computer.</p></article></div>
-  </section>
 </div>
-
 <div class="modal" id="newChatModal" onclick="closeModalOnBackdrop(event,'newChatModal')"><div class="modal-card"><button class="modal-close" onclick="closeModal('newChatModal')">×</button><h3>Start a conversation</h3><p class="muted">Create a group or start a chat with a contact.</p><div class="modal-section"><label>Group name</label><input id="groupName" placeholder="e.g. Sales Team"></div><div class="member-picker">{% for u in users %}<label><input type="checkbox" value="{{u.id}}"><span>{{u.name}}</span><small>{{u.org_name}}</small></label>{% endfor %}</div><button class="primary-btn" onclick="createGroup()">Create Group</button></div></div>
 <div class="modal" id="actionModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('actionModal')">×</button><h3 id="actionTitle">TMD Chat</h3><p class="muted" id="actionText"></p><button class="primary-btn" onclick="closeModal('actionModal')">OK</button></div></div>
 <div class="modal" id="contactsModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('contactsModal')">×</button><h3>Contacts</h3><p class="muted">Your saved TMD Chat contacts</p><div style="display:flex;gap:8px;margin:12px 0"><input id="contactPhone" type="tel" placeholder="Enter mobile number" style="flex:1;padding:12px;border:1px solid #d8e6f5;border-radius:10px"><button class="primary-btn" style="white-space:nowrap" onclick="addContact()">＋ Add Contact</button></div><div id="contactStatus" class="muted" style="min-height:20px"></div><div class="member-picker">{% for u in contacts %}<label style="cursor:pointer" onclick="startChat({{u.id}})"><span>{{u.name}}</span><small>{{u.phone}}{% if u.org_name %} • {{u.org_name }}{% endif %}</small></label>{% else %}<div class="empty-state">No contacts saved yet. Add a TMD Chat user by mobile number.</div>{% endfor %}</div></div></div>

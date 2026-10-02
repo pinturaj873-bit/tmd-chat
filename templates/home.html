@@ -9,15 +9,15 @@
       <div><strong><span>TMD</span> Chat</strong><small>CONNECT • COMMUNICATE • GROW</small></div>
     </a>
     <div class="ref-features">
-      <div><span>•••</span><b>One to One<br>Chat</b></div>
-      <div><span>👥</span><b>Group<br>Chat</b></div>
-      <div><span>▧</span><b>Photo & Video<br>Sharing</b></div>
-      <div><span>▤</span><b>Document<br>Sharing</b></div>
-      <div><span>♟</span><b>Voice<br>Message</b></div>
-      <div><span>☎</span><b>Voice & Video<br>Calls</b></div>
-      <div><span>👥</span><b>Company / Shop<br>Team Chat</b></div>
-      <div><span>✓</span><b>Secure<br>& Private</b></div>
-      <div><span>▣</span><b>Works on<br>Mobile & Computer</b></div>
+      <div onclick="openContacts()"><span>•••</span><b>One to One<br>Chat</b></div>
+      <div onclick="openModal('newChatModal')"><span>👥</span><b>Group<br>Chat</b></div>
+      <div onclick="showAction('Photo & Video Sharing','Open a chat to share photos and videos.')"><span>▧</span><b>Photo & Video<br>Sharing</b></div>
+      <div onclick="showAction('Document Sharing','Open a chat to share PDF, Word, Excel and other supported documents.')"><span>▤</span><b>Document<br>Sharing</b></div>
+      <div onclick="showAction('Voice Message','Open a chat to record and send a voice message.')"><span>♟</span><b>Voice<br>Message</b></div>
+      <div onclick="showAction('Voice & Video Calls','Calling will be available from an active chat.')"><span>☎</span><b>Voice & Video<br>Calls</b></div>
+      <div onclick="openModal('newChatModal')"><span>👥</span><b>Company / Shop<br>Team Chat</b></div>
+      <div onclick="showAction('Secure & Private','Your TMD Chat account is protected by mobile OTP login and session authentication.')"><span>✓</span><b>Secure<br>& Private</b></div>
+      <div onclick="location.href='/link'"><span>▣</span><b>Works on<br>Mobile & Computer</b></div>
     </div>
     <div class="ref-user"><div class="avatar mini">{{user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small><i></i> Online</small></div><span>⌄</span></div>
   </header>

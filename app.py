@@ -41,7 +41,15 @@ def init_db():
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args,**kwargs):
-        if "user_id" not in session: return redirect(url_for("login"))
+        uid = session.get("user_id")
+        if not uid:
+            return redirect(url_for("login"))
+        con = db()
+        user = con.execute("SELECT id FROM users WHERE id=?", (uid,)).fetchone()
+        con.close()
+        if user is None:
+            session.clear()
+            return redirect(url_for("login"))
         return fn(*args,**kwargs)
     return wrapper
 

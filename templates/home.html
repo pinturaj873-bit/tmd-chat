@@ -1,1 +1,82 @@
-{% extends "base.html" %}{% block title %}TMD Chat{% endblock %}{% block content %}<div class="chat-app"><aside class="sidebar"><div class="sidebar-head"><div><h1>Chats</h1><p>{{user.org_name}} · {{user.org_type|title}}</p></div><button class="icon-btn" onclick="openModal('newChatModal')">＋</button></div><div class="search-box"><span>⌕</span><input id="chatSearch" placeholder="Search chats, people, groups..." oninput="filterChats(this.value)"></div><div class="chat-tabs"><button class="active">All</button><button>Unread{% if unread %}<i>{{unread}}</i>{% endif %}</button><button>Groups</button><button>Teams</button></div><div id="chatList" class="chat-list">{% for c in chats %}<a class="chat-item" href="/chat/{{c.id}}" data-search="{{(c.title ~ ' ' ~ c.last_message)|lower}}"><div class="avatar {% if c.kind=='announcement' %}dark{% endif %}">{{c.title[:1]|upper}}</div><div class="chat-item-main"><div class="chat-title-row"><strong>{{c.title}}</strong><small>{% if c.message_count %}{{c.message_count}}{% else %}—{% endif %}</small></div><p>{{c.last_message[:55]}}</p></div></a>{% else %}<div class="empty-state">No chats yet.</div>{% endfor %}</div><div class="sidebar-profile"><div class="avatar user-avatar">{{user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small>{{user.role|title}}</small></div><a href="/link" title="Link computer">▣</a></div></aside><section class="home-panel"><div class="home-hero"><div class="hero-copy"><div class="hero-logo"><span class="brand-mark">TMD</span></div><h2>Hello, {{user.name}}</h2><p>Everything your team needs to connect and work together.</p><div class="hero-actions"><button class="primary-btn small" onclick="openModal('newChatModal')">＋ New Chat</button><a class="ghost-btn small" href="/link">▣ Link Computer</a></div></div><div class="hero-art"><div class="device-card"><span>💬</span><b>TMD Chat</b><small>Company · Shop · Team</small></div></div></div><div class="feature-grid"><div class="feature-card"><span>💬</span><b>One to One</b><small>Private conversations</small></div><div class="feature-card"><span>👥</span><b>Group Chat</b><small>Teams & departments</small></div><div class="feature-card"><span>🖼</span><b>Photo & Video</b><small>Share media easily</small></div><div class="feature-card"><span>📄</span><b>Documents</b><small>Files in one place</small></div><div class="feature-card"><span>🎙</span><b>Voice</b><small>Send voice messages</small></div><div class="feature-card"><span>📱</span><b>All Devices</b><small>Mobile + computer</small></div></div><div class="contacts-card"><div class="section-title"><div><h3>Contacts</h3><p>People already using TMD Chat</p></div><span class="count-pill">{{users|length}}</span></div><div class="contacts-grid">{% for u in users %}<button class="contact-card" onclick="startChat({{u.id}})"><div class="avatar">{{u.name[:1]|upper}}</div><div><strong>{{u.name}}</strong><small>{{u.org_name or 'TMD Chat member'}}</small></div><span>›</span></button>{% else %}<div class="empty-state wide">No other users yet. Create another account on a different phone to start a real chat.</div>{% endfor %}</div></div></section></div><nav class="mobile-nav"><a class="active" href="/home"><span>💬</span>Chats</a><button onclick="openModal('newChatModal')"><span>＋</span>New</button><a href="/link"><span>▣</span>Devices</a><a href="/logout"><span>↪</span>Logout</a></nav><div class="modal" id="newChatModal" onclick="closeModalOnBackdrop(event,'newChatModal')"><div class="modal-card"><button class="modal-close" onclick="closeModal('newChatModal')">×</button><h3>Start a conversation</h3><p class="muted">Create a group or start a chat with a contact.</p><div class="modal-section"><label>Group name</label><input id="groupName" placeholder="e.g. Sales Team"></div><div class="member-picker">{% for u in users %}<label><input type="checkbox" value="{{u.id}}"><span>{{u.name}}</span><small>{{u.org_name}}</small></label>{% endfor %}</div><button class="primary-btn" onclick="createGroup()">Create Group</button></div></div>{% endblock %}{% block scripts %}<script>function filterChats(q){q=q.toLowerCase();document.querySelectorAll('#chatList .chat-item').forEach(x=>x.style.display=x.dataset.search.includes(q)?'flex':'none')}async function startChat(id){const r=await fetch('/api/direct-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:id})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to start chat')}async function createGroup(){const title=document.getElementById('groupName').value.trim();const member_ids=[...document.querySelectorAll('.member-picker input:checked')].map(x=>x.value);if(!title)return alert('Enter a group name');const r=await fetch('/api/chats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,kind:'group',member_ids})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to create group')}</script>{% endblock %}
+{% extends "base.html" %}
+{% block title %}TMD Chat{% endblock %}
+{% block body_class %}home-body{% endblock %}
+{% block content %}
+<div class="reference-dashboard">
+  <header class="ref-header">
+    <a class="ref-brand" href="/home">
+      <img src="/static/icon.svg" alt="TMD Chat">
+      <div><strong><span>TMD</span> Chat</strong><small>CONNECT • COMMUNICATE • GROW</small></div>
+    </a>
+    <div class="ref-features">
+      <div><span>•••</span><b>One to One<br>Chat</b></div>
+      <div><span>👥</span><b>Group<br>Chat</b></div>
+      <div><span>▧</span><b>Photo & Video<br>Sharing</b></div>
+      <div><span>▤</span><b>Document<br>Sharing</b></div>
+      <div><span>♟</span><b>Voice<br>Message</b></div>
+      <div><span>☎</span><b>Voice & Video<br>Calls</b></div>
+      <div><span>👥</span><b>Company / Shop<br>Team Chat</b></div>
+      <div><span>✓</span><b>Secure<br>& Private</b></div>
+      <div><span>▣</span><b>Works on<br>Mobile & Computer</b></div>
+    </div>
+    <div class="ref-user"><div class="avatar mini">{{user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small><i></i> Online</small></div><span>⌄</span></div>
+  </header>
+
+  <main class="ref-main">
+    <aside class="ref-nav">
+      <a class="active" href="/home"><span>▣</span>Chats{% if unread %}<em>{{unread}}</em>{% endif %}</a>
+      <a href="#groups"><span>♣</span>Groups</a>
+      <a href="#contacts"><span>♙</span>Contacts</a>
+      <a href="#calls"><span>☎</span>Calls</a>
+      <a href="#files"><span>▤</span>Files</a>
+      <a href="#announcements"><span>⚑</span>Announcements</a>
+      <a href="#settings"><span>⚙</span>Settings</a>
+      <div class="ref-nav-user"><div class="avatar">{{user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small>{{user.role|title}}</small></div></div>
+    </aside>
+
+    <section class="ref-chat-list">
+      <div class="ref-search"><span>⌕</span><input id="chatSearch" placeholder="Search chats, people, groups..." oninput="filterChats(this.value)"></div>
+      <div class="ref-tabs"><button class="active">All</button><button>Unread{% if unread %}<em>{{unread}}</em>{% endif %}</button><button>Groups</button><button>Teams</button></div>
+      <div id="chatList">
+        {% for c in chats %}
+        <a class="ref-chat-item" href="/chat/{{c.id}}" data-search="{{(c.title ~ ' ' ~ c.last_message)|lower}}">
+          <div class="ref-avatar {% if c.kind=='announcement' %}navy{% endif %}">{{c.title[:1]|upper}}</div>
+          <div><strong>{{c.title}}</strong><p>{{c.last_message[:48]}}</p></div><time>{% if c.message_count %}{{c.message_count}}{% else %}—{% endif %}</time>
+        </a>
+        {% else %}<div class="empty-state">No chats yet.</div>{% endfor %}
+      </div>
+      <button class="ref-add" onclick="openModal('newChatModal')">＋</button>
+    </section>
+
+    <section class="ref-conversation">
+      <div class="ref-conv-head">
+        <div class="ref-avatar team">👥</div><div><h2>{% if chats %}{{chats[0].title}}{% else %}TMD Chat{% endif %}</h2><p>{% if chats %}Team conversation{% else %}Company • Shop • Team{% endif %} <i></i> Online</p></div>
+        <div class="ref-conv-actions"><button>⌕</button><button>▣</button><button>☎</button><button>⋮</button></div>
+      </div>
+      <div class="ref-empty-conv">
+        <div class="ref-welcome-icon">TMD</div>
+        <h2>Welcome to TMD Chat</h2>
+        <p>Select a chat from the left to start messaging.</p>
+        <button class="primary-btn" onclick="openModal('newChatModal')">＋ New Chat</button>
+      </div>
+      <div class="ref-composer"><button>☺</button><button>⌕</button><input placeholder="Type a message..." disabled><button>▣</button><button class="mic">♩</button></div>
+    </section>
+
+    <aside class="ref-download">
+      <h2>Download<br><strong>TMD Chat</strong></h2>
+      <p>Scan the QR Code and start<br>chatting with your team now!</p>
+      <div class="download-card"><b>▣ &nbsp; Android App</b><img src="/qr.png?data={{request.url_root}}"></div>
+      <div class="download-card"><b>● &nbsp; iOS App</b><img src="/qr.png?data={{request.url_root}}"></div>
+      <div class="download-card web-card"><b>▣ &nbsp; Web App (Computer)</b><img src="/qr.png?data={{request.url_root}}"><small>⌾ {{request.host}}</small></div>
+    </aside>
+  </main>
+
+  <section class="ref-howto">
+    <h2>How to Use TMD Chat</h2>
+    <div><article><b>1</b><strong>▧</strong><h3>Scan the QR Code</h3><p>Scan the QR code from Android, iOS or Web.</p></article><span>›</span><article><b>2</b><strong>⇩</strong><h3>Download & Install</h3><p>Install the TMD Chat application on your device.</p></article><span>›</span><article><b>3</b><strong>♙</strong><h3>Login / Sign Up</h3><p>Login with your mobile number (OTP).</p></article><span>›</span><article><b>4</b><strong>•••</strong><h3>Start Chatting</h3><p>Chat with your team, shops or colleagues.</p></article><span>›</span><article><b>5</b><strong>▣</strong><h3>Use on All Devices</h3><p>Same account on mobile and computer.</p></article></div>
+  </section>
+</div>
+
+<div class="modal" id="newChatModal" onclick="closeModalOnBackdrop(event,'newChatModal')"><div class="modal-card"><button class="modal-close" onclick="closeModal('newChatModal')">×</button><h3>Start a conversation</h3><p class="muted">Create a group or start a chat with a contact.</p><div class="modal-section"><label>Group name</label><input id="groupName" placeholder="e.g. Sales Team"></div><div class="member-picker">{% for u in users %}<label><input type="checkbox" value="{{u.id}}"><span>{{u.name}}</span><small>{{u.org_name}}</small></label>{% endfor %}</div><button class="primary-btn" onclick="createGroup()">Create Group</button></div></div>
+{% endblock %}
+{% block scripts %}<script>function filterChats(q){q=q.toLowerCase();document.querySelectorAll('#chatList .ref-chat-item').forEach(x=>x.style.display=x.dataset.search.includes(q)?'grid':'none')}async function startChat(id){const r=await fetch('/api/direct-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:id})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to start chat')}async function createGroup(){const title=document.getElementById('groupName').value.trim();const member_ids=[...document.querySelectorAll('.member-picker input:checked')].map(x=>x.value);if(!title)return alert('Enter a group name');const r=await fetch('/api/chats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,kind:'group',member_ids})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to create group')}</script>{% endblock %}

@@ -2,10 +2,10 @@ import os, sqlite3, secrets, time, mimetypes, uuid
 from io import BytesIO
 import qrcode
 from functools import wraps
-from urllib.parse import urljoin, urlencode, parse_qs
+from urllib.parse import urljoin, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
-import json
+import json, base64
 from flask import Flask, request, session, redirect, url_for, render_template, jsonify, send_from_directory, send_file
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -86,7 +86,7 @@ def messagecentral_enabled():
 def messagecentral_token():
     params=urlencode({
         "customerId":os.environ["MC_CUSTOMER_ID"],
-        "key":os.environ["MC_KEY"],
+        "key":base64.b64encode(os.environ["MC_KEY"].encode("utf-8")).decode("ascii"),
         "scope":"NEW",
         "country":os.environ.get("MC_COUNTRY","91"),
         "email":os.environ["MC_EMAIL"],
@@ -108,6 +108,7 @@ def messagecentral_send_otp(phone):
     mobile=phone[2:] if phone.startswith(country) and len(phone)>len(country) else phone
     params=urlencode({
         "countryCode":country,
+        "customerId":os.environ["MC_CUSTOMER_ID"],
         "flowType":"SMS",
         "mobileNumber":mobile,
         "otpLength":"6",
@@ -130,7 +131,7 @@ def messagecentral_send_otp(phone):
 
 def messagecentral_verify_otp(verification_id, code):
     token=messagecentral_token()
-    params=urlencode({"verificationId":verification_id,"code":code})
+    params=urlencode({"countryCode":os.environ.get("MC_COUNTRY","91"),"customerId":os.environ["MC_CUSTOMER_ID"],"mobileNumber":session.get("pending_phone","")[len(os.environ.get("MC_COUNTRY","91")):],"verificationId":verification_id,"code":code})
     req=Request(
         "https://cpaas.messagecentral.com/verification/v3/validateOtp/?"+params,
         headers={"authToken":token},

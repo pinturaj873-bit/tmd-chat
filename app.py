@@ -2,7 +2,10 @@ import os, sqlite3, secrets, time, mimetypes, uuid
 from io import BytesIO
 import qrcode
 from functools import wraps
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlencode, parse_qs
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
+import json
 from flask import Flask, request, session, redirect, url_for, render_template, jsonify, send_from_directory, send_file
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -70,30 +73,124 @@ def current_user(con):
 @app.route("/")
 def index(): return redirect(url_for("home") if "user_id" in session else url_for("login"))
 
+def normalize_phone(raw):
+    phone=(raw or "").strip().replace(" ","").replace("-","").replace("(","").replace(")","")
+    if phone.startswith("+"): phone=phone[1:]
+    if phone.isdigit() and len(phone)==10:
+        phone="91"+phone
+    return phone
+
+def messagecentral_enabled():
+    return all(os.environ.get(k) for k in ("MC_CUSTOMER_ID","MC_EMAIL","MC_KEY"))
+
+def messagecentral_token():
+    params=urlencode({
+        "customerId":os.environ["MC_CUSTOMER_ID"],
+        "key":os.environ["MC_KEY"],
+        "scope":"NEW",
+        "country":os.environ.get("MC_COUNTRY","91"),
+        "email":os.environ["MC_EMAIL"],
+    })
+    req=Request(
+        "https://cpaas.messagecentral.com/auth/v1/authentication/token?"+params,
+        headers={"accept":"*/*"},
+        method="GET",
+    )
+    with urlopen(req,timeout=20) as resp:
+        data=json.loads(resp.read().decode("utf-8"))
+    token=data.get("token")
+    if not token:
+        raise RuntimeError(data.get("message") or "Message Central token generation failed")
+    return token
+
+def messagecentral_send_otp(phone):
+    country=os.environ.get("MC_COUNTRY","91")
+    mobile=phone[2:] if phone.startswith(country) and len(phone)>len(country) else phone
+    params=urlencode({
+        "countryCode":country,
+        "flowType":"SMS",
+        "mobileNumber":mobile,
+        "otpLength":"6",
+    })
+    token=messagecentral_token()
+    req=Request(
+        "https://cpaas.messagecentral.com/verification/v3/send?"+params,
+        data=b"",
+        headers={"authToken":token},
+        method="POST",
+    )
+    with urlopen(req,timeout=20) as resp:
+        data=json.loads(resp.read().decode("utf-8"))
+    if str(data.get("responseCode")) != "200":
+        raise RuntimeError(data.get("message") or data.get("data",{}).get("errorMessage") or "OTP could not be sent")
+    verification_id=data.get("data",{}).get("verificationId")
+    if not verification_id:
+        raise RuntimeError("OTP service did not return a verification ID")
+    return verification_id
+
+def messagecentral_verify_otp(verification_id, code):
+    token=messagecentral_token()
+    params=urlencode({"verificationId":verification_id,"code":code})
+    req=Request(
+        "https://cpaas.messagecentral.com/verification/v3/validateOtp/?"+params,
+        headers={"authToken":token},
+        method="GET",
+    )
+    with urlopen(req,timeout=20) as resp:
+        data=json.loads(resp.read().decode("utf-8"))
+    status=str(data.get("data",{}).get("verificationStatus","")).upper()
+    return str(data.get("responseCode"))=="200" and status in ("VERIFICATION_COMPLETED","VERIFIED")
+
 @app.route("/login",methods=["GET","POST"])
 def login():
     if request.method=="POST":
-        phone=request.form.get("phone","").strip().replace(" ","").replace("-","")
-        if phone.startswith("+"): phone=phone[1:]
-        if not phone.isdigit() or len(phone)<10: return render_template("login.html",error="Please enter a valid mobile number.")
-        code=os.environ.get("DEV_OTP") or f"{secrets.randbelow(1000000):06d}"
-        con=db(); con.execute("REPLACE INTO otp_codes(phone,code,expires_at) VALUES(?,?,?)",(phone,code,int(time.time())+300)); con.commit(); con.close()
+        phone=normalize_phone(request.form.get("phone",""))
+        if not phone.isdigit() or len(phone)<10 or len(phone)>15:
+            return render_template("login.html",error="Please enter a valid mobile number.")
         session["pending_phone"]=phone
-        return render_template("otp.html",dev_otp=code if os.environ.get("DEV_OTP") else None)
+
+        if messagecentral_enabled():
+            try:
+                verification_id=messagecentral_send_otp(phone)
+                session["mc_verification_id"]=str(verification_id)
+                session.pop("dev_otp",None)
+                return render_template("otp.html")
+            except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError):
+                session.pop("mc_verification_id",None)
+                return render_template("login.html",error="OTP service could not send the SMS. Please try again.")
+        else:
+            code=os.environ.get("DEV_OTP") or f"{secrets.randbelow(1000000):06d}"
+            con=db(); con.execute("REPLACE INTO otp_codes(phone,code,expires_at) VALUES(?,?,?)",(phone,code,int(time.time())+300)); con.commit(); con.close()
+            session["dev_otp"]=code
+            return render_template("otp.html",dev_otp=code if os.environ.get("DEV_OTP") else None)
     return render_template("login.html")
 
 @app.route("/verify",methods=["POST"])
 def verify():
     phone=session.get("pending_phone"); code=request.form.get("code","").strip()
     if not phone: return redirect(url_for("login"))
-    con=db(); row=con.execute("SELECT * FROM otp_codes WHERE phone=?",(phone,)).fetchone()
-    if not row or row["expires_at"]<int(time.time()) or row["code"]!=code:
-        con.close(); return render_template("otp.html",error="Invalid or expired OTP.")
-    user=con.execute("SELECT * FROM users WHERE phone=?",(phone,)).fetchone()
+
+    if session.get("mc_verification_id"):
+        try:
+            verified=messagecentral_verify_otp(session["mc_verification_id"],code)
+        except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError):
+            verified=False
+        if not verified:
+            return render_template("otp.html",error="Invalid or expired OTP.")
+    else:
+        con=db(); row=con.execute("SELECT * FROM otp_codes WHERE phone=?",(phone,)).fetchone()
+        if not row or row["expires_at"]<int(time.time()) or row["code"]!=code:
+            con.close(); return render_template("otp.html",error="Invalid or expired OTP.")
+
+    con=db(); user=con.execute("SELECT * FROM users WHERE phone=?",(phone,)).fetchone()
     if user:
-        session["user_id"]=user["id"]; session.pop("pending_phone",None); ensure_default_membership(con,user["id"]); con.commit(); con.close()
+        session["user_id"]=user["id"]
+        session.pop("pending_phone",None); session.pop("mc_verification_id",None); session.pop("dev_otp",None)
+        ensure_default_membership(con,user["id"]); con.commit(); con.close()
         return redirect(url_for("home"))
-    session["verified_phone"]=phone; session.pop("pending_phone",None); con.close()
+    session["verified_phone"]=phone
+    session.pop("pending_phone",None); session.pop("mc_verification_id",None); session.pop("dev_otp",None)
+    con.close()
     return redirect(url_for("profile_setup"))
 
 @app.route("/profile-setup",methods=["GET","POST"])

@@ -57,3 +57,24 @@
 .status-item .avatar{width:38px;height:38px;flex-basis:38px;border-radius:50%}
 .status-item strong{font-size:12px}.status-item p{margin:3px 0 0;font-size:11px;color:#6f8196}
 @media(max-width:600px){.settings-grid{grid-template-columns:1fr}.settings-grid label.wide{grid-column:auto}}
+
+/* Dashboard typography: normal weight */
+.reference-dashboard .ref-brand strong,
+.reference-dashboard .ref-features b,
+.reference-dashboard .ref-user strong,
+.reference-dashboard .ref-nav>a,
+.reference-dashboard .ref-nav-user strong,
+.reference-dashboard .ref-search input,
+.reference-dashboard .ref-tabs button,
+.reference-dashboard .ref-chat-item strong,
+.reference-dashboard .ref-conv-head h2,
+.reference-dashboard .ref-download h2,
+.reference-dashboard .ref-download h2 strong,
+.reference-dashboard .ref-download b,
+.reference-dashboard .ref-howto h2,
+.reference-dashboard .ref-howto h3 {
+  font-weight: 400 !important;
+}
+.reference-dashboard .ref-brand small {
+  font-weight: 400 !important;
+}

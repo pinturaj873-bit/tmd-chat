@@ -81,9 +81,15 @@ def normalize_phone(raw):
     return phone
 
 def messagecentral_enabled():
-    return all(os.environ.get(k) for k in ("MC_CUSTOMER_ID","MC_EMAIL","MC_KEY"))
+    # Message Central console provides a ready-to-use Auth Token.
+    # Keep the key-based token generation as a fallback for accounts that use it.
+    return bool(os.environ.get("MC_CUSTOMER_ID") and (os.environ.get("MC_AUTH_TOKEN") or (os.environ.get("MC_EMAIL") and os.environ.get("MC_KEY"))))
 
 def messagecentral_token():
+    direct_token=os.environ.get("MC_AUTH_TOKEN")
+    if direct_token:
+        return direct_token.strip()
+
     params=urlencode({
         "customerId":os.environ["MC_CUSTOMER_ID"],
         "key":base64.b64encode(os.environ["MC_KEY"].encode("utf-8")).decode("ascii"),

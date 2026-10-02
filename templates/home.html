@@ -25,12 +25,12 @@
   <main class="ref-main">
     <aside class="ref-nav">
       <a class="active" href="/home"><span>▣</span>Chats{% if unread %}<em>{{unread}}</em>{% endif %}</a>
-      <a href="#groups"><span>♣</span>Groups</a>
-      <a href="#contacts"><span>♙</span>Contacts</a>
-      <a href="#calls"><span>☎</span>Calls</a>
-      <a href="#files"><span>▤</span>Files</a>
-      <a href="#announcements"><span>⚑</span>Announcements</a>
-      <a href="#settings"><span>⚙</span>Settings</a>
+      <a href="#" onclick="openModal('newChatModal');return false;"><span>♣</span>Groups</a>
+      <a href="#" onclick="openContacts();return false;"><span>♙</span>Contacts</a>
+      <a href="#" onclick="showAction('Calls','Voice and video calling will be available from an active chat.');return false;"><span>☎</span>Calls</a>
+      <a href="#" onclick="showAction('Files','Open a chat to send and receive documents, photos, videos and voice messages.');return false;"><span>▤</span>Files</a>
+      <a href="#" onclick="showAction('Announcements','Company Announcements is available in your chat list.');return false;"><span>⚑</span>Announcements</a>
+      <a href="#" onclick="showAction('Settings','TMD Chat settings panel will be connected here next.');return false;"><span>⚙</span>Settings</a>
       <div class="ref-nav-user"><div class="avatar">{{user.name[:1]|upper}}</div><div><strong>{{user.name}}</strong><small>{{user.role|title}}</small></div></div>
     </aside>
 
@@ -78,5 +78,7 @@
 </div>
 
 <div class="modal" id="newChatModal" onclick="closeModalOnBackdrop(event,'newChatModal')"><div class="modal-card"><button class="modal-close" onclick="closeModal('newChatModal')">×</button><h3>Start a conversation</h3><p class="muted">Create a group or start a chat with a contact.</p><div class="modal-section"><label>Group name</label><input id="groupName" placeholder="e.g. Sales Team"></div><div class="member-picker">{% for u in users %}<label><input type="checkbox" value="{{u.id}}"><span>{{u.name}}</span><small>{{u.org_name}}</small></label>{% endfor %}</div><button class="primary-btn" onclick="createGroup()">Create Group</button></div></div>
+<div class="modal" id="actionModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('actionModal')">×</button><h3 id="actionTitle">TMD Chat</h3><p class="muted" id="actionText"></p><button class="primary-btn" onclick="closeModal('actionModal')">OK</button></div></div>
+<div class="modal" id="contactsModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('contactsModal')">×</button><h3>Contacts</h3><p class="muted">People already using TMD Chat</p><div class="member-picker">{% for u in users %}<label style="cursor:pointer" onclick="startChat({{u.id}})"><span>{{u.name}}</span><small>{{u.org_name or 'TMD Chat member'}}</small></label>{% else %}<div class="empty-state">No other users yet.</div>{% endfor %}</div></div></div>
 {% endblock %}
-{% block scripts %}<script>function filterChats(q){q=q.toLowerCase();document.querySelectorAll('#chatList .ref-chat-item').forEach(x=>x.style.display=x.dataset.search.includes(q)?'grid':'none')}async function startChat(id){const r=await fetch('/api/direct-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:id})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to start chat')}async function createGroup(){const title=document.getElementById('groupName').value.trim();const member_ids=[...document.querySelectorAll('.member-picker input:checked')].map(x=>x.value);if(!title)return alert('Enter a group name');const r=await fetch('/api/chats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,kind:'group',member_ids})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to create group')}</script>{% endblock %}
+{% block scripts %}<script>function showAction(title,text){document.getElementById('actionTitle').textContent=title;document.getElementById('actionText').textContent=text;openModal('actionModal')}function openContacts(){openModal('contactsModal')}function filterChats(q){q=q.toLowerCase();document.querySelectorAll('#chatList .ref-chat-item').forEach(x=>x.style.display=x.dataset.search.includes(q)?'grid':'none')}async function startChat(id){const r=await fetch('/api/direct-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:id})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to start chat')}async function createGroup(){const title=document.getElementById('groupName').value.trim();const member_ids=[...document.querySelectorAll('.member-picker input:checked')].map(x=>x.value);if(!title)return alert('Enter a group name');const r=await fetch('/api/chats',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,kind:'group',member_ids})});const d=await r.json();if(d.redirect)location=d.redirect;else alert(d.error||'Unable to create group')}</script>{% endblock %}

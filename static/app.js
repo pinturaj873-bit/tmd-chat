@@ -1,0 +1,1 @@
+document.addEventListener("DOMContentLoaded",()=>{if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{})});window.openModal=id=>document.getElementById(id)?.classList.add("open");window.closeModal=id=>document.getElementById(id)?.classList.remove("open");window.closeModalOnBackdrop=(e,id)=>{if(e.target===e.currentTarget)window.closeModal(id)};

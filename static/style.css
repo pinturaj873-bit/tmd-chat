@@ -173,3 +173,58 @@
 .tmd-rail-logo img{width:31px;height:31px}
 .tmd-brand-line img{width:30px;height:30px}
 .tmd-brand-line strong{font-size:21px}
+
+
+/* Final TMD Chat sky-blue dashboard palette */
+.tmd-wa-shell{
+  background:
+    radial-gradient(circle at 10% 0,#bfefff 0,transparent 32%),
+    radial-gradient(circle at 92% 100%,#a9dff0 0,transparent 36%),
+    linear-gradient(135deg,#bdeaf7,#d8f3fa 52%,#b6e4f2) !important;
+}
+.tmd-rail{
+  background:linear-gradient(180deg,#5db8d8,#3e9fc3) !important;
+  border-right-color:#318eaf !important;
+}
+.tmd-rail nav a,.tmd-rail-bottom a,.tmd-rail-bottom button{
+  background:#238fbb !important;
+  color:#fff !important;
+  border-color:#58b8d6 !important;
+}
+.tmd-rail nav a:hover,.tmd-rail-bottom a:hover,.tmd-rail-bottom button:hover{
+  background:#147da9 !important;
+  color:#fff !important;
+}
+.tmd-rail nav a.active{
+  background:#087caf !important;
+  color:#fff !important;
+  border-color:#72c9e2 !important;
+  box-shadow:0 6px 15px rgba(20,102,133,.28) !important;
+}
+.tmd-rail em{color:#fff !important}
+.tmd-chat-sidebar{
+  background:rgba(239,250,254,.95) !important;
+}
+.tmd-conversation{
+  background:rgba(222,245,251,.92) !important;
+}
+.tmd-conversation-head,.tmd-composer{
+  background:rgba(239,250,254,.97) !important;
+}
+.tmd-message-area{
+  background:
+    radial-gradient(circle at 20% 20%,rgba(122,207,232,.34),transparent 28%),
+    linear-gradient(135deg,#c8edf7,#b4e1ee) !important;
+}
+.tmd-chat-row:first-child{background:#c9edf7 !important}
+.tmd-chat-row:hover{background:#d9f3fa !important}
+.tmd-search{background:#e5f7fc !important}
+.tmd-filters button,.tmd-head-actions button,.tmd-conv-actions button,.tmd-composer>button{
+  background:#9bdced !important;
+  color:#fff !important;
+}
+.tmd-filters button.active,.tmd-new-chat,.tmd-composer .tmd-mic{
+  background:#218fba !important;
+  color:#fff !important;
+}
+.tmd-archive{background:#c5edf7 !important;color:#3d7283 !important}

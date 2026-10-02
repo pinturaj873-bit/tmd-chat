@@ -401,6 +401,17 @@ def link_status(token):
     if not row: return jsonify(error="Link session not found"),404
     return jsonify(confirmed=bool(row["confirmed"]),last_seen=row["last_seen"])
 
+@app.get("/qr.png")
+def qr_png():
+    data = request.args.get("data", "")
+    if not data:
+        return ("Missing QR data", 400)
+    img = qrcode.make(data)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return send_file(buf, mimetype="image/png", max_age=0)
+
 @app.get("/manifest.webmanifest")
 def manifest():
     return jsonify(name="TMD Chat",short_name="TMD Chat",description="Private company, shop and team communication",start_url="/home",scope="/",display="standalone",theme_color="#1288e8",background_color="#f4f9ff",icons=[{"src":"/static/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}])

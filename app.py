@@ -16,6 +16,7 @@ DB = os.path.join(APP_DIR, "tmd_chat.db")
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-in-production")
 app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024
+app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 180
 
 def db():
     con = sqlite3.connect(DB)
@@ -37,6 +38,7 @@ def init_db():
     cols = {r["name"] for r in con.execute("PRAGMA table_info(linked_devices)").fetchall()}
     if "device_name" not in cols: con.execute("ALTER TABLE linked_devices ADD COLUMN device_name TEXT DEFAULT 'Computer'")
     if "confirmed" not in cols: con.execute("ALTER TABLE linked_devices ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0")
+    if "expires_at" not in cols: con.execute("ALTER TABLE linked_devices ADD COLUMN expires_at INTEGER DEFAULT 0")
     now = int(time.time())
     if con.execute("SELECT COUNT(*) FROM chats").fetchone()[0] == 0:
         con.execute("INSERT INTO chats(title,kind,created_at) VALUES(?,?,?)",("Team Discussion","group",now))
@@ -192,6 +194,7 @@ def login():
         phone=normalize_phone(request.form.get("phone",""))
         if not phone.isdigit() or len(phone)<10 or len(phone)>15:
             return render_template("login.html",error="Please enter a valid mobile number.")
+        session.permanent=True
         session["pending_phone"]=phone
 
         if messagecentral_enabled():
@@ -227,6 +230,7 @@ def verify():
     con=db(); user=con.execute("SELECT * FROM users WHERE phone=?",(phone,)).fetchone()
     if user:
         session["user_id"]=user["id"]
+        session.permanent=True
         session.pop("pending_phone",None); session.pop("mc_verification_id",None); session.pop("dev_otp",None)
         ensure_default_membership(con,user["id"]); con.commit(); con.close()
         return redirect(url_for("home"))
@@ -243,7 +247,7 @@ def profile_setup():
         name=request.form.get("name","").strip(); org_type=request.form.get("org_type","company"); org_name=request.form.get("org_name","").strip()
         if not name or not org_name: return render_template("setup.html",error="Name and company/shop/team are required.")
         con=db(); cur=con.execute("INSERT INTO users(phone,name,role,org_type,org_name,created_at) VALUES(?,?,?,?,?,?)",(phone,name,"member",org_type,org_name,int(time.time()))); uid=cur.lastrowid
-        ensure_default_membership(con,uid); con.commit(); con.close(); session["user_id"]=uid; session.pop("verified_phone",None)
+        ensure_default_membership(con,uid); con.commit(); con.close(); session["user_id"]=uid; session.permanent=True; session.pop("verified_phone",None)
         return redirect(url_for("home"))
     return render_template("setup.html",phone=phone)
 
@@ -374,32 +378,46 @@ def notifications_read():
     con=db(); con.execute("UPDATE notifications SET is_read=1 WHERE user_id=?",(session["user_id"],)); con.commit(); con.close(); return jsonify(ok=True)
 
 @app.get("/link")
-@login_required
 def link_page():
-    con=db(); user=current_user(con)
-    if user is None:
-        con.close(); session.clear(); return redirect(url_for("login"))
     token=secrets.token_urlsafe(32)
-    con.execute("INSERT INTO linked_devices(user_id,token,device_name,confirmed,created_at,last_seen) VALUES(?,?,?,?,?,?)",(user["id"],token,"Computer",0,int(time.time()),int(time.time()))); con.commit(); con.close()
+    now=int(time.time())
+    expires=now + 300
+    con=db()
+    con.execute("INSERT INTO linked_devices(user_id,token,device_name,confirmed,created_at,last_seen,expires_at) VALUES(?,?,?,?,?,?,?)",(0,token,"Computer",0,now,now,expires))
+    con.commit(); con.close()
     link_url=urljoin(request.host_url,url_for("link_confirm",token=token))
-    return render_template("qr.html",user=user,link_url=link_url,token=token)
+    return render_template("qr.html",link_url=link_url,token=token,logged_in=bool(session.get("user_id")))
 
 @app.route("/link/confirm")
 def link_confirm():
     token=request.args.get("token","")
-    if "user_id" not in session: return render_template("link_confirm.html",token=token,needs_login=True)
-    con=db(); row=con.execute("SELECT * FROM linked_devices WHERE token=?",(token,)).fetchone()
-    if not row: con.close(); return render_template("link_confirm.html",error="This QR code is invalid or expired.")
-    if row["user_id"]!=session["user_id"]: con.close(); return render_template("link_confirm.html",error="This QR code belongs to another account.")
-    con.execute("UPDATE linked_devices SET confirmed=1,last_seen=? WHERE id=?",(int(time.time()),row["id"])); con.commit(); con.close()
+    con=db()
+    row=con.execute("SELECT * FROM linked_devices WHERE token=?",(token,)).fetchone()
+    if not row or (row["expires_at"] and row["expires_at"]<int(time.time())):
+        con.close(); return render_template("link_confirm.html",token=token,error="This QR code is invalid or expired.")
+    if "user_id" not in session:
+        con.close(); return render_template("link_confirm.html",token=token,needs_login=True)
+    con.execute("UPDATE linked_devices SET user_id=?,confirmed=1,last_seen=? WHERE id=?",(session["user_id"],int(time.time()),row["id"]))
+    con.commit(); con.close()
+    session.permanent=True
     return render_template("link_confirm.html",success=True)
 
 @app.get("/api/link-status/<token>")
-@login_required
 def link_status(token):
-    con=db(); row=con.execute("SELECT confirmed,last_seen FROM linked_devices WHERE token=? AND user_id=?",(token,session["user_id"])).fetchone(); con.close()
-    if not row: return jsonify(error="Link session not found"),404
-    return jsonify(confirmed=bool(row["confirmed"]),last_seen=row["last_seen"])
+    con=db()
+    row=con.execute("SELECT confirmed,user_id,last_seen,expires_at FROM linked_devices WHERE token=?",(token,)).fetchone()
+    if not row:
+        con.close(); return jsonify(error="Link session not found"),404
+    if row["expires_at"] and row["expires_at"]<int(time.time()):
+        con.close(); return jsonify(error="Link QR expired"),410
+    if row["confirmed"] and row["user_id"]>0:
+        session["user_id"]=row["user_id"]
+        session.permanent=True
+        con.execute("UPDATE linked_devices SET last_seen=? WHERE token=?",(int(time.time()),token))
+        con.commit(); con.close()
+        return jsonify(confirmed=True,login=True,last_seen=int(time.time()))
+    con.close()
+    return jsonify(confirmed=False,login=False,last_seen=row["last_seen"])
 
 @app.get("/qr.png")
 def qr_png():

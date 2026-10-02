@@ -111,7 +111,7 @@ def messagecentral_token():
 
 def messagecentral_send_otp(phone):
     country=os.environ.get("MC_COUNTRY","91")
-    mobile=phone[2:] if phone.startswith(country) and len(phone)>len(country) else phone
+    mobile=phone[len(country):] if phone.startswith(country) and len(phone)>len(country) else phone
     params=urlencode({
         "countryCode":country,
         "customerId":os.environ["MC_CUSTOMER_ID"],
@@ -123,30 +123,68 @@ def messagecentral_send_otp(phone):
     req=Request(
         "https://cpaas.messagecentral.com/verification/v3/send?"+params,
         data=b"",
-        headers={"authToken":token},
+        headers={"authToken":token,"accept":"*/*"},
         method="POST",
     )
-    with urlopen(req,timeout=20) as resp:
-        data=json.loads(resp.read().decode("utf-8"))
+    try:
+        with urlopen(req,timeout=20) as resp:
+            data=json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        raw=exc.read().decode("utf-8","replace")
+        try:
+            data=json.loads(raw)
+        except ValueError:
+            data={}
+        code=data.get("responseCode") or data.get("data",{}).get("responseCode") or exc.code
+        message=data.get("message") or data.get("data",{}).get("errorMessage") or "OTP could not be sent"
+        raise RuntimeError(f"Message Central error {code}: {message}")
     if str(data.get("responseCode")) != "200":
-        raise RuntimeError(data.get("message") or data.get("data",{}).get("errorMessage") or "OTP could not be sent")
+        code=data.get("responseCode") or data.get("data",{}).get("responseCode") or "UNKNOWN"
+        message=data.get("message") or data.get("data",{}).get("errorMessage") or "OTP could not be sent"
+        raise RuntimeError(f"Message Central error {code}: {message}")
     verification_id=data.get("data",{}).get("verificationId")
     if not verification_id:
-        raise RuntimeError("OTP service did not return a verification ID")
+        raise RuntimeError("Message Central did not return a verification ID")
     return verification_id
 
+
 def messagecentral_verify_otp(verification_id, code):
+    country=os.environ.get("MC_COUNTRY","91")
+    phone=session.get("pending_phone","")
+    mobile=phone[len(country):] if phone.startswith(country) and len(phone)>len(country) else phone
     token=messagecentral_token()
-    params=urlencode({"countryCode":os.environ.get("MC_COUNTRY","91"),"customerId":os.environ["MC_CUSTOMER_ID"],"mobileNumber":session.get("pending_phone","")[len(os.environ.get("MC_COUNTRY","91")):],"verificationId":verification_id,"code":code})
+    params=urlencode({
+        "countryCode":country,
+        "customerId":os.environ["MC_CUSTOMER_ID"],
+        "mobileNumber":mobile,
+        "verificationId":verification_id,
+        "code":code,
+    })
     req=Request(
-        "https://cpaas.messagecentral.com/verification/v3/validateOtp/?"+params,
-        headers={"authToken":token},
+        "https://cpaas.messagecentral.com/verification/v3/validateOtp?"+params,
+        headers={"authToken":token,"accept":"*/*"},
         method="GET",
     )
-    with urlopen(req,timeout=20) as resp:
-        data=json.loads(resp.read().decode("utf-8"))
+    try:
+        with urlopen(req,timeout=20) as resp:
+            data=json.loads(resp.read().decode("utf-8"))
+    except HTTPError as exc:
+        raw=exc.read().decode("utf-8","replace")
+        try:
+            data=json.loads(raw)
+        except ValueError:
+            data={}
+        code_value=data.get("responseCode") or data.get("data",{}).get("responseCode") or exc.code
+        message=data.get("message") or data.get("data",{}).get("errorMessage") or "OTP verification failed"
+        raise RuntimeError(f"Message Central error {code_value}: {message}")
+    response_code=str(data.get("responseCode"))
     status=str(data.get("data",{}).get("verificationStatus","")).upper()
-    return str(data.get("responseCode"))=="200" and status in ("VERIFICATION_COMPLETED","VERIFIED")
+    if response_code=="200" and status in ("VERIFICATION_COMPLETED","VERIFIED"):
+        return True
+    code_value=data.get("responseCode") or data.get("data",{}).get("responseCode") or "UNKNOWN"
+    message=data.get("message") or data.get("data",{}).get("errorMessage") or "OTP verification failed"
+    raise RuntimeError(f"Message Central error {code_value}: {message}")
+
 
 @app.route("/login",methods=["GET","POST"])
 def login():
@@ -162,9 +200,8 @@ def login():
                 session["mc_verification_id"]=str(verification_id)
                 session.pop("dev_otp",None)
                 return render_template("otp.html")
-            except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError):
-                session.pop("mc_verification_id",None)
-                return render_template("login.html",error="OTP service could not send the SMS. Please try again.")
+            except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+                return render_template("login.html",error=str(exc) or "OTP service could not send the SMS.")
         else:
             code=os.environ.get("DEV_OTP") or f"{secrets.randbelow(1000000):06d}"
             con=db(); con.execute("REPLACE INTO otp_codes(phone,code,expires_at) VALUES(?,?,?)",(phone,code,int(time.time())+300)); con.commit(); con.close()
@@ -180,10 +217,8 @@ def verify():
     if session.get("mc_verification_id"):
         try:
             verified=messagecentral_verify_otp(session["mc_verification_id"],code)
-        except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError):
-            verified=False
-        if not verified:
-            return render_template("otp.html",error="Invalid or expired OTP.")
+        except (HTTPError, URLError, TimeoutError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
+            return render_template("otp.html",error=str(exc) or "OTP verification failed.")
     else:
         con=db(); row=con.execute("SELECT * FROM otp_codes WHERE phone=?",(phone,)).fetchone()
         if not row or row["expires_at"]<int(time.time()) or row["code"]!=code:

@@ -28,6 +28,7 @@ def init_db():
     con = db()
     con.executescript("""
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT,phone TEXT UNIQUE NOT NULL,name TEXT NOT NULL,avatar TEXT DEFAULT '',role TEXT DEFAULT 'member',org_type TEXT DEFAULT 'company',org_name TEXT DEFAULT '',created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS statuses(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,status_type TEXT NOT NULL DEFAULT 'text',body TEXT DEFAULT '',media_url TEXT DEFAULT '',created_at INTEGER NOT NULL,expires_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS otp_codes(phone TEXT PRIMARY KEY,code TEXT NOT NULL,expires_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS chats(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,kind TEXT NOT NULL DEFAULT 'group',created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS chat_members(chat_id INTEGER NOT NULL,user_id INTEGER NOT NULL,joined_at INTEGER NOT NULL,PRIMARY KEY(chat_id,user_id));
@@ -36,6 +37,10 @@ def init_db():
     CREATE TABLE IF NOT EXISTS contacts(user_id INTEGER NOT NULL,contact_user_id INTEGER NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(user_id,contact_user_id));
     CREATE TABLE IF NOT EXISTS linked_devices(id INTEGER PRIMARY KEY AUTOINCREMENT,user_id INTEGER NOT NULL,token TEXT UNIQUE NOT NULL,device_name TEXT DEFAULT 'Computer',confirmed INTEGER NOT NULL DEFAULT 0,created_at INTEGER NOT NULL,last_seen INTEGER NOT NULL);
     """)
+    u_cols = {r["name"] for r in con.execute("PRAGMA table_info(users)").fetchall()}
+    if "avatar" not in u_cols: con.execute("ALTER TABLE users ADD COLUMN avatar TEXT DEFAULT ''")
+    if "background" not in u_cols: con.execute("ALTER TABLE users ADD COLUMN background TEXT DEFAULT ''")
+    if "status_text" not in u_cols: con.execute("ALTER TABLE users ADD COLUMN status_text TEXT DEFAULT ''")
     cols = {r["name"] for r in con.execute("PRAGMA table_info(linked_devices)").fetchall()}
     if "device_name" not in cols: con.execute("ALTER TABLE linked_devices ADD COLUMN device_name TEXT DEFAULT 'Computer'")
     if "confirmed" not in cols: con.execute("ALTER TABLE linked_devices ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0")
@@ -313,6 +318,63 @@ def contacts_api():
     rows=con.execute("SELECT u.id,u.name,u.phone,u.org_name,u.org_type FROM contacts c JOIN users u ON u.id=c.contact_user_id WHERE c.user_id=? ORDER BY u.name",(session["user_id"],)).fetchall()
     con.close()
     return jsonify([dict(r) for r in rows])
+
+@app.post("/api/profile")
+@login_required
+def update_profile():
+    name=(request.form.get("name") or "").strip()
+    status_text=(request.form.get("status_text") or "").strip()[:120]
+    con=db()
+    user=con.execute("SELECT * FROM users WHERE id=?",(session["user_id"],)).fetchone()
+    if not user:
+        con.close(); return jsonify(error="User not found"),404
+    avatar=user["avatar"] or ""
+    background=user["background"] or ""
+    avatar_file=request.files.get("avatar")
+    background_file=request.files.get("background")
+    def save_file(f, allowed_prefixes, max_bytes=5*1024*1024):
+        if not f or not f.filename: return ""
+        raw=f.read()
+        if len(raw)>max_bytes: raise ValueError("File must be 5 MB or smaller")
+        mime=f.mimetype or ""
+        if not any(mime.startswith(p) for p in allowed_prefixes): raise ValueError("Unsupported file type")
+        ext=os.path.splitext(f.filename)[1].lower()[:10]
+        stored=f"{uuid.uuid4().hex}{ext}"
+        with open(os.path.join(UPLOAD_DIR,stored),"wb") as out: out.write(raw)
+        return url_for("uploaded_file",name=stored)
+    try:
+        if avatar_file: avatar=save_file(avatar_file,("image/",))
+        if background_file: background=save_file(background_file,("image/",))
+    except ValueError as exc:
+        con.close(); return jsonify(error=str(exc)),400
+    con.execute("UPDATE users SET name=?,avatar=?,background=?,status_text=? WHERE id=?",(name or user["name"],avatar,background,status_text,session["user_id"]))
+    con.commit(); con.close()
+    return jsonify(ok=True,avatar=avatar,background=background,status_text=status_text)
+
+@app.get("/api/statuses")
+@login_required
+def statuses_api():
+    con=db(); now=int(time.time())
+    con.execute("DELETE FROM statuses WHERE expires_at<=?",(now,))
+    rows=con.execute("SELECT s.*,u.name,u.avatar FROM statuses s JOIN users u ON u.id=s.user_id WHERE s.expires_at>? ORDER BY s.id DESC",(now,)).fetchall()
+    con.commit(); con.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.post("/api/statuses")
+@login_required
+def create_status():
+    body=(request.form.get("body") or "").strip()[:500]
+    media_url=(request.form.get("media_url") or "").strip()
+    status_type="text"
+    if media_url:
+        status_type="media"
+    if not body and not media_url:
+        return jsonify(error="Write a status or upload a photo/video."),400
+    con=db(); now=int(time.time())
+    con.execute("INSERT INTO statuses(user_id,status_type,body,media_url,created_at,expires_at) VALUES(?,?,?,?,?,?)",(session["user_id"],status_type,body,media_url,now,now+86400))
+    con.execute("UPDATE users SET status_text=? WHERE id=?",(body,session["user_id"]))
+    con.commit(); con.close()
+    return jsonify(ok=True)
 
 @app.post("/api/direct-chat")
 @login_required
